@@ -27,7 +27,6 @@ import kafka.autobalancer.services.AbstractResumableService;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.common.utils.ConfigUtils;
-import org.apache.kafka.controller.es.ClusterStats;
 import org.apache.kafka.server.metrics.s3stream.S3StreamKafkaMetricsManager;
 
 import java.util.ArrayList;
@@ -73,17 +72,12 @@ public class AnomalyDetector extends AbstractResumableService {
         this.executionIntervalMs = executionIntervalMs;
         this.clusterModel = clusterModel;
         this.actionExecutor = actionExecutor;
-        this.executorService = Executors.newScheduledThreadPool(2, new AutoBalancerThreadFactory("anomaly-detector"));
+        this.executorService = Executors.newScheduledThreadPool(1, new AutoBalancerThreadFactory("anomaly-detector"));
         this.goalsByPriority = goals;
         Collections.sort(this.goalsByPriority);
         this.excludedBrokers = excludedBrokers;
         this.excludedTopics = excludedTopics;
         this.executorService.schedule(this::detect, detectInterval, TimeUnit.MILLISECONDS);
-        this.executorService.scheduleAtFixedRate(() -> {
-            if (isRunning()) {
-                updateClusterStats(clusterModel, maxTolerateMetricsDelayMs);
-            }
-        }, 30, 30, TimeUnit.SECONDS);
         S3StreamKafkaMetricsManager.setSlowBrokerSupplier(() -> this.slowBrokers);
         logger.info("detectInterval: {}ms, executionConcurrency: {}, executionIntervalMs: {}ms, goals: {}, excluded brokers: {}, excluded topics: {}",
                 this.detectInterval, this.executionConcurrency, this.executionIntervalMs, this.goalsByPriority, this.excludedBrokers, this.excludedTopics);
@@ -108,13 +102,6 @@ public class AnomalyDetector extends AbstractResumableService {
     @Override
     public void doPause() {
 
-    }
-
-    public void updateClusterStats(ClusterModel clusterModel, long maxTolerateMetricsDelayMs) {
-        ClusterModel.ClusterLoad clusterLoad = clusterModel.getClusterLoad(maxTolerateMetricsDelayMs);
-        ClusterStats.getInstance().updateBrokerLoads(clusterLoad.brokerLoads());
-        ClusterStats.getInstance().updatePartitionLoads(clusterLoad.partitionLoads());
-        ClusterStats.getInstance().updateExcludedBrokers(getExcludedBrokers());
     }
 
     public Set<Integer> getExcludedBrokers() {
@@ -201,7 +188,6 @@ public class AnomalyDetector extends AbstractResumableService {
                 AutoBalancerControllerConfig tmp = new AutoBalancerControllerConfig(configs, false);
                 this.excludedBrokers = tmp.getList(AutoBalancerControllerConfig.AUTO_BALANCER_CONTROLLER_EXCLUDE_BROKER_IDS)
                         .stream().map(Integer::parseInt).collect(Collectors.toSet());
-                ClusterStats.getInstance().updateExcludedBrokers(this.excludedBrokers);
             }
             if (configs.containsKey(AutoBalancerControllerConfig.AUTO_BALANCER_CONTROLLER_EXCLUDE_TOPICS)) {
                 AutoBalancerControllerConfig tmp = new AutoBalancerControllerConfig(configs, false);

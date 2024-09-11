@@ -140,49 +140,6 @@ public class ClusterModel {
         return snapshot;
     }
 
-    public ClusterLoad getClusterLoad(long maxToleratedMetricsDelay) {
-        clusterLock.lock();
-        try {
-            Map<Integer, Double> brokerLoads = new HashMap<>();
-            Map<TopicPartition, Double> tpLoads = new HashMap<>();
-            boolean invalid = false;
-            long now = System.currentTimeMillis();
-            for (Map.Entry<Integer, Map<TopicPartition, TopicPartitionReplicaUpdater>> entry : brokerReplicaMap.entrySet()) {
-                int brokerId = entry.getKey();
-                brokerLoads.put(brokerId, 0.0);
-                for (Map.Entry<TopicPartition, TopicPartitionReplicaUpdater> tpEntry : entry.getValue().entrySet()) {
-                    TopicPartition tp = tpEntry.getKey();
-                    TopicPartitionReplicaUpdater replicaUpdater = tpEntry.getValue();
-                    TopicPartitionReplicaUpdater.TopicPartitionReplica replica =
-                            (TopicPartitionReplicaUpdater.TopicPartitionReplica) replicaUpdater.get(now - maxToleratedMetricsDelay);
-                    if (replica == null || replica.isMetricsOutOfDate()) {
-                        invalid = true;
-                        brokerLoads = null;
-                        tpLoads = null;
-                        break;
-                    }
-                    tpLoads.put(tp, partitionLoad(replica));
-                    brokerLoads.compute(brokerId, (id, load) -> {
-                        if (load == null) {
-                            return partitionLoad(replica);
-                        }
-                        return load + partitionLoad(replica);
-                    });
-                }
-                if (invalid) {
-                    break;
-                }
-            }
-            return new ClusterLoad(brokerLoads, tpLoads);
-        } finally {
-            clusterLock.unlock();
-        }
-    }
-
-    protected double partitionLoad(TopicPartitionReplicaUpdater.TopicPartitionReplica replica) {
-        return replica.loadValue(Resource.NW_IN) + replica.loadValue(Resource.NW_OUT);
-    }
-
     private void accumulateLoads(Map<Byte, AbstractInstanceUpdater.Load> totalLoads, TopicPartitionReplicaUpdater.TopicPartitionReplica replica) {
         for (Map.Entry<Byte, AbstractInstanceUpdater.Load> load : replica.getLoads().entrySet()) {
             byte resource = load.getKey();

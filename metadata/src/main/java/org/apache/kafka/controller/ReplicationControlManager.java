@@ -95,8 +95,9 @@ import org.apache.kafka.common.utils.LogContext;
 import org.apache.kafka.controller.es.AutoMQCreateTopicPolicy;
 import org.apache.kafka.controller.es.CreatePartitionPolicy;
 import org.apache.kafka.controller.es.ElasticCreatePartitionPolicy;
-import org.apache.kafka.controller.es.LoadAwarePartitionLeaderSelector;
-import org.apache.kafka.controller.es.PartitionLeaderSelector;
+import org.apache.kafka.controller.es.selector.DefaultPartitionLeaderSelectorFactory;
+import org.apache.kafka.controller.es.selector.PartitionLeaderSelector;
+import org.apache.kafka.controller.es.selector.PartitionLeaderSelectorFactory;
 import org.apache.kafka.controller.stream.NodeControlManager;
 import org.apache.kafka.controller.stream.TopicDeletion;
 import org.apache.kafka.image.writer.ImageWriterOptions;
@@ -185,6 +186,7 @@ public class ReplicationControlManager {
         private FeatureControlManager featureControl = null;
         private boolean eligibleLeaderReplicasEnabled = false;
         private Controller quorumController = null;
+        private PartitionLeaderSelectorFactory partitionLeaderSelectorFactory = null;
 
         Builder setSnapshotRegistry(SnapshotRegistry snapshotRegistry) {
             this.snapshotRegistry = snapshotRegistry;
@@ -246,6 +248,11 @@ public class ReplicationControlManager {
             this.quorumController = quorumController;
             return this;
         }
+
+        public Builder setPartitionLeaderSelectorFactory(PartitionLeaderSelectorFactory partitionLeaderSelectorFactory) {
+            this.partitionLeaderSelectorFactory = partitionLeaderSelectorFactory;
+            return this;
+        }
         // AutoMQ for Kafka inject end
 
         ReplicationControlManager build() {
@@ -259,6 +266,11 @@ public class ReplicationControlManager {
             if (featureControl == null) {
                 throw new IllegalStateException("FeatureControlManager must not be null");
             }
+            // AutoMQ for Kafka inject start
+            if (partitionLeaderSelectorFactory == null) {
+                partitionLeaderSelectorFactory = new DefaultPartitionLeaderSelectorFactory();
+            }
+            // AutoMQ for Kafka inject end
             return new ReplicationControlManager(snapshotRegistry,
                 logContext,
                 defaultReplicationFactor,
@@ -271,7 +283,8 @@ public class ReplicationControlManager {
                 createTopicPolicy,
                 featureControl,
                 // AutoMQ for Kafka inject start
-                quorumController
+                quorumController,
+                partitionLeaderSelectorFactory
                 // AutoMQ for Kafka inject end
             );
         }
@@ -390,6 +403,8 @@ public class ReplicationControlManager {
     private final Controller quorumController;
 
     private NodeControlManager nodeControlManager;
+
+    private final PartitionLeaderSelectorFactory partitionLeaderSelectorFactory;
     // AutoMQ for Kafka inject end
 
 
@@ -481,7 +496,8 @@ public class ReplicationControlManager {
         ClusterControlManager clusterControl,
         Optional<CreateTopicPolicy> createTopicPolicy,
         FeatureControlManager featureControl,
-        Controller quorumController
+        Controller quorumController,
+        PartitionLeaderSelectorFactory partitionLeaderSelectorFactory
     ) {
         this.snapshotRegistry = snapshotRegistry;
         this.log = logContext.logger(ReplicationControlManager.class);
@@ -503,6 +519,7 @@ public class ReplicationControlManager {
         this.imbalancedPartitions = new TimelineHashSet<>(snapshotRegistry, 0);
         this.directoriesToPartitions = new TimelineHashMap<>(snapshotRegistry, 0);
         this.quorumController = quorumController;
+        this.partitionLeaderSelectorFactory = partitionLeaderSelectorFactory;
     }
 
     public void replay(TopicRecord record) {
@@ -2164,7 +2181,7 @@ public class ReplicationControlManager {
                     builder.setTargetNode(brokerToAdd);
                 } else {
                     if (partitionLeaderSelector == null) {
-                        partitionLeaderSelector = new LoadAwarePartitionLeaderSelector(clusterControl.getActiveBrokers(), brokerRegistrationToRemove);
+                        partitionLeaderSelector = partitionLeaderSelectorFactory.create(clusterControl.getActiveBrokers(), brokerRegistrationToRemove);
                     }
                     partitionLeaderSelector
                         .select(new TopicPartition(topic.name(), topicIdPart.partitionId()))

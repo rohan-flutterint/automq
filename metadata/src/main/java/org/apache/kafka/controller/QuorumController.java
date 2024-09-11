@@ -145,6 +145,8 @@ import org.apache.kafka.common.utils.Time;
 import org.apache.kafka.common.utils.Utils;
 import org.apache.kafka.controller.errors.ControllerExceptions;
 import org.apache.kafka.controller.errors.EventHandlerExceptionInfo;
+import org.apache.kafka.controller.es.selector.DefaultPartitionLeaderSelectorFactory;
+import org.apache.kafka.controller.es.selector.PartitionLeaderSelectorFactory;
 import org.apache.kafka.controller.metrics.QuorumControllerMetrics;
 import org.apache.kafka.controller.stream.DefaultNodeRuntimeInfoGetter;
 import org.apache.kafka.controller.stream.KVControlManager;
@@ -288,6 +290,7 @@ public final class QuorumController implements Controller {
         private StreamClient streamClient;
         private List<String> quorumVoters = Collections.emptyList();
         private Function<QuorumController, QuorumControllerExtension> extension = c -> QuorumControllerExtension.NOOP;
+        private PartitionLeaderSelectorFactory partitionLeaderSelectorFactory = null;
         // AutoMQ for Kafka inject end
 
         public Builder(int nodeId, String clusterId) {
@@ -459,6 +462,11 @@ public final class QuorumController implements Controller {
             this.extension = extension;
             return this;
         }
+
+        public Builder setPartitionLeaderSelectorFactory(PartitionLeaderSelectorFactory partitionLeaderSelectorFactory) {
+            this.partitionLeaderSelectorFactory = partitionLeaderSelectorFactory;
+            return this;
+        }
         // AutoMQ for Kafka inject end
 
         public QuorumController build() throws Exception {
@@ -482,6 +490,9 @@ public final class QuorumController implements Controller {
             }
             if (controllerMetrics == null) {
                 controllerMetrics = new QuorumControllerMetrics(Optional.empty(), time, zkMigrationEnabled);
+            }
+            if (partitionLeaderSelectorFactory == null) {
+                partitionLeaderSelectorFactory = new DefaultPartitionLeaderSelectorFactory();
             }
 
             KafkaEventQueue queue = null;
@@ -521,7 +532,8 @@ public final class QuorumController implements Controller {
                     eligibleLeaderReplicasEnabled,
                     streamClient,
                     quorumVoters,
-                    extension
+                    extension,
+                    partitionLeaderSelectorFactory
                 );
             } catch (Exception e) {
                 Utils.closeQuietly(queue, "event queue");
@@ -2034,7 +2046,8 @@ public final class QuorumController implements Controller {
         // AutoMQ inject start
         StreamClient streamClient,
         List<String> quorumVoters,
-        Function<QuorumController, QuorumControllerExtension> extension
+        Function<QuorumController, QuorumControllerExtension> extension,
+        PartitionLeaderSelectorFactory partitionLeaderSelectorFactory
         // AutoMQ inject end
 
     ) {
@@ -2118,6 +2131,7 @@ public final class QuorumController implements Controller {
             setFeatureControl(featureControl).
             // AutoMQ for Kafka inject start
             setQuorumController(this).
+            setPartitionLeaderSelectorFactory(partitionLeaderSelectorFactory).
             // AutoMQ for Kafka inject end
             build();
         this.scramControlManager = new ScramControlManager.Builder().

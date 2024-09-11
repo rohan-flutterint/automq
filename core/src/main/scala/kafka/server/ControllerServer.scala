@@ -39,6 +39,7 @@ import org.apache.kafka.common.security.scram.internals.ScramMechanism
 import org.apache.kafka.common.security.token.delegation.internals.DelegationTokenCache
 import org.apache.kafka.common.utils.LogContext
 import org.apache.kafka.common.{ClusterResource, Endpoint, Uuid}
+import org.apache.kafka.controller.es.selector.{DefaultPartitionLeaderSelectorFactory, PartitionLeaderSelectorFactory}
 import org.apache.kafka.controller.metrics.{ControllerMetadataMetricsPublisher, QuorumControllerMetrics}
 import org.apache.kafka.controller.{QuorumController, QuorumControllerExtension, QuorumFeatures}
 import org.apache.kafka.image.publisher.{ControllerRegistrationsPublisher, MetadataPublisher}
@@ -292,7 +293,8 @@ class ControllerServer(
           setStreamClient(streamClient).
           setExtension(c => quorumControllerExtension(c)).
           setQuorumVoters(config.quorumVoters).
-          setReplicaPlacer(replicaPlacer())
+          setReplicaPlacer(replicaPlacer()).
+          setPartitionLeaderSelectorFactory(partitionLeaderSelectorFactory())
       }
       controller = controllerBuilder.build()
 
@@ -582,6 +584,10 @@ class ControllerServer(
 
   protected def replicaPlacer(): ReplicaPlacer = {
     new StripedReplicaPlacer(new Random())
+  }
+
+  protected def partitionLeaderSelectorFactory(): PartitionLeaderSelectorFactory = {
+    new DefaultPartitionLeaderSelectorFactory()
   }
   // AutoMQ for Kafka inject end
 }
