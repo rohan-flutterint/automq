@@ -16,10 +16,12 @@ import com.automq.stream.s3.metrics.MetricsLevel;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.metrics.LongCounter;
 
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 
 public class CounterMetric extends ConfigurableMetric {
     private final Supplier<LongCounter> longCounterSupplier;
+    private final AtomicLong total = new AtomicLong(0);
 
     public CounterMetric(MetricsConfig metricsConfig, Supplier<LongCounter> longCounterSupplier) {
         super(metricsConfig, Attributes.empty());
@@ -32,10 +34,15 @@ public class CounterMetric extends ConfigurableMetric {
     }
 
     public boolean add(MetricsLevel metricsLevel, long value) {
+        total.addAndGet(value);
         if (metricsLevel.isWithin(this.metricsLevel)) {
             longCounterSupplier.get().add(value, attributes);
             return true;
         }
         return false;
+    }
+
+    public long getValue() {
+        return total.get();
     }
 }
