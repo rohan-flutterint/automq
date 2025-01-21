@@ -343,6 +343,9 @@ public class LogConfig extends AbstractConfig {
                 .define(TopicConfig.TABLE_TOPIC_PARTITION_BY_CONFIG, STRING, null, null, MEDIUM, TopicConfig.TABLE_TOPIC_PARTITION_BY_DOC)
                 .define(TopicConfig.TABLE_TOPIC_UPSERT_ENABLE_CONFIG, BOOLEAN, false, null, MEDIUM, TopicConfig.TABLE_TOPIC_UPSERT_ENABLE_DOC)
                 .define(TopicConfig.TABLE_TOPIC_CDC_FIELD_CONFIG, STRING, null, null, MEDIUM, TopicConfig.TABLE_TOPIC_CDC_FIELD_DOC)
+                .define(TopicConfig.KAFKA_LINKING_TASK_ID_CONFIG, STRING, null, null, MEDIUM, TopicConfig.KAFKA_LINKING_TASK_ID_DOC)
+                .define(TopicConfig.KAFKA_LINKING_TOPIC_SYNC_OFFSET_CONFIG, STRING, null, null, MEDIUM, TopicConfig.KAFKA_LINKING_TOPIC_SYNC_OFFSET_DOC)
+                .define(TopicConfig.KAFKA_LINKING_TOPIC_SYNC_STATE_CONFIG, STRING, null, null, MEDIUM, TopicConfig.KAFKA_LINKING_TOPIC_SYNC_STATE_DOC)
                 // AutoMQ inject end
                 .define(TopicConfig.REMOTE_LOG_DISABLE_POLICY_CONFIG, STRING, TopicConfig.REMOTE_LOG_DISABLE_POLICY_RETAIN,
                         in(TopicConfig.REMOTE_LOG_DISABLE_POLICY_RETAIN, TopicConfig.REMOTE_LOG_DISABLE_POLICY_DELETE),
@@ -402,6 +405,10 @@ public class LogConfig extends AbstractConfig {
     public final String tableTopicPartitionBy;
     public final boolean tableTopicUpsertEnable;
     public final String tableTopicCdcField;
+
+    public final String kafkaLinkingTaskId;
+    public final String kafkaLinkingTopicSyncOffset;
+    public final String kafkaLinkingTopicSyncState;
     // AutoMQ inject end
 
     private final int maxMessageSize;
@@ -463,6 +470,10 @@ public class LogConfig extends AbstractConfig {
         this.tableTopicPartitionBy = getString(TopicConfig.TABLE_TOPIC_PARTITION_BY_CONFIG);
         this.tableTopicUpsertEnable = getBoolean(TopicConfig.TABLE_TOPIC_UPSERT_ENABLE_CONFIG);
         this.tableTopicCdcField = getString(TopicConfig.TABLE_TOPIC_CDC_FIELD_CONFIG);
+
+        this.kafkaLinkingTaskId = getString(TopicConfig.KAFKA_LINKING_TASK_ID_CONFIG);
+        this.kafkaLinkingTopicSyncOffset = getString(TopicConfig.KAFKA_LINKING_TOPIC_SYNC_OFFSET_CONFIG);
+        this.kafkaLinkingTopicSyncState = getString(TopicConfig.KAFKA_LINKING_TOPIC_SYNC_STATE_CONFIG);
         // AutoMQ inject end
 
         remoteLogConfig = new RemoteLogConfig(this);

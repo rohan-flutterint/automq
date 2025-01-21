@@ -4,6 +4,7 @@ import com.automq.stream.api.exceptions.FastReadFailFastException
 import com.automq.stream.s3.metrics.{MetricsLevel, TimerUtil}
 import com.automq.stream.utils.FutureUtil
 import com.automq.stream.utils.threads.S3StreamThreadPoolMonitor
+import kafka.automq.kafkalinking.ReplicateFetcherManager
 import kafka.cluster.Partition
 import kafka.log.remote.RemoteLogManager
 import kafka.log.streamaspect.{ElasticLogManager, PartitionStatusTracker, ReadHint}
@@ -88,6 +89,7 @@ class ElasticReplicaManager(
   private val fastFetchExecutor: ExecutorService = S3StreamThreadPoolMonitor.createAndMonitor(4, 4, 0L, TimeUnit.MILLISECONDS, "kafka-apis-fast-fetch-executor", true, 10000),
   private val slowFetchExecutor: ExecutorService = S3StreamThreadPoolMonitor.createAndMonitor(12, 12, 0L, TimeUnit.MILLISECONDS, "kafka-apis-slow-fetch-executor", true, 10000),
   private val partitionMetricsCleanerExecutor: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor(ThreadUtils.createThreadFactory("kafka-partition-metrics-cleaner", true)),
+  replicateManager: Option[ReplicateFetcherManager[AbstractFetcherThread]] = None
 ) extends ReplicaManager(config, metrics, time, scheduler, logManager, remoteLogManager, quotaManagers, metadataCache,
   logDirFailureChannel, alterPartitionManager, brokerTopicStats, isShuttingDown, zkClient, delayedProducePurgatoryParam,
   delayedFetchPurgatoryParam, delayedDeleteRecordsPurgatoryParam, delayedElectLeaderPurgatoryParam,
@@ -203,6 +205,7 @@ class ElasticReplicaManager(
     val partitions = partitionsToStop.map(_.topicPartition)
     replicaFetcherManager.removeFetcherForPartitions(partitions)
     replicaAlterLogDirsManager.removeFetcherForPartitions(partitions)
+    replicateManager.foreach(_.removeFetcherForPartitions(partitions))
 
     // Second remove deleted partitions from the partition map. Fetchers rely on the
     // ReplicaManager to get Partition's information so they must be stopped first.
@@ -908,6 +911,7 @@ class ElasticReplicaManager(
 
       replicaFetcherManager.removeFetcherForPartitions(newOfflinePartitions)
       replicaAlterLogDirsManager.removeFetcherForPartitions(newOfflinePartitions ++ partitionsWithOfflineFutureReplica.map(_.topicPartition))
+      replicateManager.foreach(_.removeFetcherForPartitions(newOfflinePartitions))
 
       // These partitions should first be made offline to remove topic metrics.
       newOfflinePartitions.foreach { topicPartition =>
@@ -1160,6 +1164,7 @@ class ElasticReplicaManager(
 
           replicaFetcherManager.shutdownIdleFetcherThreads()
           replicaAlterLogDirsManager.shutdownIdleFetcherThreads()
+          replicateManager.foreach(_.shutdownIdleFetcherThreads())
 
           remoteLogManager.foreach(rlm => rlm.onLeadershipChange(leaderChangedPartitions.asJava, followerChangedPartitions.asJava, localChanges.topicIds()))
         }
@@ -1220,6 +1225,7 @@ class ElasticReplicaManager(
         }
       }
     }
+    replicateManager.foreach(_.addPartitions(localLeaders.keySet.asJava))
   }
 
   override protected def applyLocalFollowersDelta(
