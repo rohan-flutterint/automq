@@ -90,9 +90,10 @@ public final class ServerTopicConfigSynonyms {
         sameName(TopicConfig.TABLE_TOPIC_NAMESPACE_CONFIG),
         sameName(TopicConfig.TABLE_TOPIC_SCHEMA_TYPE_CONFIG),
 
-        sameName(TopicConfig.KAFKA_LINKING_REMOTE_CLUSTER_ID_CONFIG),
+        sameName(TopicConfig.KAFKA_LINKING_TASK_ID_CONFIG),
         sameName(TopicConfig.KAFKA_LINKING_TOPIC_SYNC_OFFSET_CONFIG),
         sameName(TopicConfig.KAFKA_LINKING_TOPIC_SYNC_STATE_CONFIG),
+        sameName(TopicConfig.KAFKA_LINKING_REMOTE_TOPIC_NAME_CONFIG),
         // AutoMQ inject end
 
         sameNameWithLogPrefix(TopicConfig.PREALLOCATE_CONFIG),
